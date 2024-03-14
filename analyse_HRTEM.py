@@ -30,11 +30,13 @@ def calculate_spectral_density(image):
 
 def process_image(image, tresh_factor):
     """
-    Processus de traitement d'une image pour détecter les contours dans la densité spectrale.
+    Processus de traitement d'une image pour détecter les contours 
+    dans la densité spectrale.
     
     Args:
         image: np.ndarray, l'image en niveaux de gris
-        tresh_factor: float, facteur de seuillage pour déterminer le seuil de binarisation
+        tresh_factor: float, facteur de seuillage pour déterminer 
+        le seuil de binarisation
         
     Returns:
         list, une liste de contours des régions d'intérêt fermées
@@ -43,9 +45,11 @@ def process_image(image, tresh_factor):
     regions_of_interest = (image > threshold).astype(np.uint8)
 
     kernel = np.ones((5, 5), np.uint8)
-    regions_of_interest_closed = cv2.morphologyEx(regions_of_interest, cv2.MORPH_CLOSE, kernel)
+    regions_of_interest_closed = cv2.morphologyEx(regions_of_interest,
+                                                  cv2.MORPH_CLOSE, kernel)
 
-    contours, _ = cv2.findContours(regions_of_interest_closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(regions_of_interest_closed,
+                                   cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     return contours
 
@@ -59,13 +63,16 @@ def draw_all_contours(image, name, factor=0.02):
         factor: float, facteur de seuillage pour déterminer le seuil de binarisation
     """
     cnt = process_image(image, factor)
-    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, cv2.NORM_MINMAX)
-    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0,
+                                      255, cv2.NORM_MINMAX)
+    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8)
+                                    , cv2.COLOR_GRAY2BGR)
 
     for i, contour in enumerate(cnt):
         cv2.drawContours(colored_spectrum, [contour], -1, (0, 0, 255), 2)
         contour_center = contour.mean(axis=0).astype(int)[0]
-        cv2.putText(colored_spectrum, str(i+1), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
+        cv2.putText(colored_spectrum, str(i+1), tuple(contour_center),
+                    cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
 
     directory = os.path.join("output", "01_all_contours")
     if not os.path.exists(directory):
@@ -83,7 +90,8 @@ def remove_contours(image, contours_to_remove, factor=0.02):
         factor: float, thresholding factor to determine the binarization threshold
     """
     bad_cnt = process_image(image, factor)
-    good_cnt = [contour for i, contour in enumerate(bad_cnt) if i not in contours_to_remove]
+    good_cnt = [contour for i, contour in enumerate(bad_cnt)
+                if i not in contours_to_remove]
 
     return good_cnt
 
@@ -96,13 +104,16 @@ def draw_good_contours(image, name, contours):
         name (str): Name of the output image file.
         contours (list): List of contours to draw on the image.
     """
-    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, cv2.NORM_MINMAX)
-    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0,
+                                      255, cv2.NORM_MINMAX)
+    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8)
+                                    , cv2.COLOR_GRAY2BGR)
 
     for i, contour in enumerate(contours):
         cv2.drawContours(colored_spectrum, [contour], -1, (0, 0, 255), 2)
         contour_center = contour.mean(axis=0).astype(int)[0]
-        cv2.putText(colored_spectrum, str(i+1), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
+        cv2.putText(colored_spectrum, str(i+1), tuple(contour_center)
+                    , cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
 
     directory = os.path.join("output", "02_contours_removed")
     os.makedirs(directory, exist_ok=True)
@@ -132,8 +143,10 @@ def find_contour_centroids(contours, image):
         image (np.ndarray): Grayscale image.
 
     Returns:
-        tuple: A tuple containing two lists. The first list contains tuples of centroid coordinates (x, y) for each contour.
-            The second list contains tuples of centroid uncertainties (x_uncertainty, y_uncertainty) for each contour.
+        tuple: A tuple containing two lists. The first list contains
+        tuples of centroid coordinates (x, y) for each contour.
+            The second list contains tuples of centroid uncertainties
+            (x_uncertainty, y_uncertainty) for each contour.
     """
     centroids = []
     centroids_uncertainty = []
@@ -148,7 +161,8 @@ def find_contour_centroids(contours, image):
 
         if len(x_coords) < 5 or len(y_coords) < 5:
             x_center, y_center = int(len(x_coords) / 2) , int(len(y_coords) / 2)
-            x_center_pix, y_center_pix = min_x_coord + x_center, min_y_coord + y_center
+            x_center_pix, y_center_pix = min_x_coord + x_center, min_y_coord 
+            + y_center
             centroids.append((x_center_pix, y_center_pix))
             centroids_uncertainty.append((0, 0))
             continue
@@ -160,9 +174,11 @@ def find_contour_centroids(contours, image):
         y_mean_intensity = np.mean(pixel_values, axis=1)
 
         x_data = np.arange(len(x_mean_intensity))
-        popt_x, cov_x = curve_fit(gaussian, x_data, x_mean_intensity, p0=[np.max(x_mean_intensity), len(x_data) / 2, 10])
+        popt_x, cov_x = curve_fit(gaussian, x_data, x_mean_intensity, 
+                                  p0=[np.max(x_mean_intensity), len(x_data) / 2, 10])
         y_data = np.arange(len(y_mean_intensity))
-        popt_y, cov_y = curve_fit(gaussian, y_data, y_mean_intensity, p0=[np.max(y_mean_intensity), len(y_data) / 2, 10])
+        popt_y, cov_y = curve_fit(gaussian, y_data, y_mean_intensity, 
+                                  p0=[np.max(y_mean_intensity), len(y_data) / 2, 10])
 
         x_center = int(popt_x[1])
         x_center_pix = min_x_coord + x_center
@@ -175,6 +191,45 @@ def find_contour_centroids(contours, image):
         centroids_uncertainty.append((x_center_uncertainty, y_center_uncertainty))
 
     return centroids, centroids_uncertainty
+
+def draw_point(image, name, centroids):
+    """
+    Draws points at the centroids in the image and saves it as an image 
+    file with the specified name.
+    
+    Parameters:
+    image (numpy.ndarray): The image to draw on.
+    name (str): The base name of the output image file.
+    centroids (list): The list of centroids to draw.
+    """
+    # Create a copy of the image to draw on
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, 
+                                      cv2.NORM_MINMAX)
+    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), 
+                                    cv2.COLOR_GRAY2BGR)
+    
+    # Iterate over the centroids and draw dots and numerotation for each one
+    for i, centroid in enumerate(centroids):
+        # Convert the centroid coordinates to integers
+        x, y = map(int, centroid)
+        
+        # Draw a dot at the centroid
+        cv2.circle(colored_spectrum, (x, y), 5, (255, 255, 255), -1)
+        
+        # Define the font and size for the numerotation
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        font_thickness = 1
+        
+        # Draw the numerotation on the image
+        cv2.putText(colored_spectrum, str(i+1), (x, y), font, font_scale,
+                    (0, 0, 0), font_thickness, cv2.LINE_AA)
+    
+    out_dir = os.path.join("output", "08_miller")
+    os.makedirs(out_dir, exist_ok=True)
+    cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
+    
+    
 
 def find_pairs(image, centroids):
     """
@@ -204,7 +259,8 @@ def find_pairs(image, centroids):
 
         for c_prime in centroids2match:
             y_prime_centroid, x_prime_centroid = c_prime
-            if abs(y_prime_centroid - y_prime) <= 10 and abs(x_prime_centroid - x_prime) <= 10:
+            if abs(y_prime_centroid - y_prime) <= 10 and abs(x_prime_centroid
+                                                             - x_prime) <= 10:
                 pos_pairs.append((c, c_prime))
                 centroids2match.remove(c_prime)
                 break
@@ -220,14 +276,18 @@ def draw_pairs(image, name, pairs):
         name (str): Name of the output image file.
         pairs (list): List of pairs of points to draw on the image.
     """
-    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, cv2.NORM_MINMAX)
-    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), cv2.COLOR_GRAY2BGR)
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255,
+                                      cv2.NORM_MINMAX)
+    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8),
+                                    cv2.COLOR_GRAY2BGR)
 
     for i, (start_point, end_point) in enumerate(pairs):
         color = tuple(np.random.randint(0, 256, 3).tolist())
-        cv2.line(colored_spectrum, start_point, end_point, color, 1, cv2.LINE_AA)
+        cv2.line(colored_spectrum, start_point, end_point, color,
+                 1, cv2.LINE_AA)
         for point in [start_point, end_point]:
-            cv2.putText(colored_spectrum, str(i + 1), point, cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+            cv2.putText(colored_spectrum, str(i + 1), point,
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
     out_dir = os.path.join("output", "03_pairs")
     os.makedirs(out_dir, exist_ok=True)
@@ -419,7 +479,8 @@ def calculate_d_spacings(signals_1d, pixel_resolution=42.468):
 
     return (d_spacings, d_spacings_std), (d_spacings_res, d_spacings_res_std)
 
-def print_d_spacings(d_spacings, d_spacings_uncert, d_spacings_res, d_spacings_res_uncert, name):
+def print_d_spacings(d_spacings, d_spacings_uncert, d_spacings_res,
+                     d_spacings_res_uncert, name):
     """
     Print d-spacings and uncertainties.
 
@@ -433,7 +494,8 @@ def print_d_spacings(d_spacings, d_spacings_uncert, d_spacings_res, d_spacings_r
     print("\n\tTable of D-Spacing of {}".format(name))
     print("Index |  D-Spacing (pixels)  |  D-Spacing (picometers)")
     print("------------------------------------------------------")
-    for i, (d, uncert, d_res, res_uncert) in enumerate(zip(d_spacings, d_spacings_uncert, d_spacings_res, d_spacings_res_uncert), 1):
+    for i, (d, uncert, d_res, res_uncert) in enumerate(zip(d_spacings, 
+            d_spacings_uncert, d_spacings_res, d_spacings_res_uncert), 1):
         spacing_str = f"{d:.3f}"
         incertitude_str = f"{uncert:.3f}"
         spacing_res_str = f"{d_res:.3f}"
