@@ -64,7 +64,7 @@ def draw_all_contours(image, name, factor=0.02):
         contour_center = contour.mean(axis=0).astype(int)[0]
         cv2.putText(colored_spectrum, str(i+1), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
 
-    directory = os.path.join("output", "all_contours")
+    directory = os.path.join("output", "01_all_contours")
     if not os.path.exists(directory):
             os.makedirs(directory)
 
@@ -101,7 +101,7 @@ def draw_good_contours(image, name, contours):
         contour_center = contour.mean(axis=0).astype(int)[0]
         cv2.putText(colored_spectrum, str(i+1), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
 
-    directory = os.path.join("output", "contours_removed")
+    directory = os.path.join("output", "02_contours_removed")
     os.makedirs(directory, exist_ok=True)
     cv2.imwrite(os.path.join(directory, name + ".png"), colored_spectrum)
 
@@ -227,7 +227,7 @@ def draw_pairs(image, name, pairs):
         for point in [start_point, end_point]:
             cv2.putText(colored_spectrum, str(i + 1), point, cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-    out_dir = os.path.join("output", "pairs")
+    out_dir = os.path.join("output", "03_pairs")
     os.makedirs(out_dir, exist_ok=True)
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
 
