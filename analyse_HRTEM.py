@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.fft import fft2, fftshift
+from scipy.fft import fft2, fftshift, ifft2, ifftshift
 import os
 import glob
 import cv2
@@ -231,6 +231,51 @@ def draw_pairs(image, name, pairs):
     os.makedirs(out_dir, exist_ok=True)
     cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
 
+def create_cos_fourier_spaces(image, pairs):
+    """
+    This function generates Fourier spaces representing the cosine frequency of interest.
+    It places the signal at the origin and one of the points of each selected pair.
+
+    Args:
+        image (np.ndarray): The input image.
+        pairs (list): A list of tuples representing pairs of points.
+
+    Returns:
+        tuple: A tuple containing two lists:
+            - The first list contains Fourier spaces representing the cosine frequencies.
+            - The second list contains the slopes of the lines connecting the pairs of points.
+    """
+    slopes = []
+    fft_lines = []
+
+    y_center = image.shape[0] // 2
+    x_center = image.shape[1] // 2
+
+    for (first_point, second_point) in pairs:
+        y1, x1 = first_point
+        y2, x2 = second_point
+
+        fft_line = np.zeros(image.shape, dtype=np.int32)
+        fft_line[y1][x1] = 1000
+        fft_line[y_center][x_center] = 1000
+        fft_lines.append(fft_line)
+        slope = (y2 - y1) / (x2 - x1)
+        slopes.append(slope)
+
+    return fft_lines, slopes
+
+def inverse_fourier_transform(fft_lines):
+    """
+    Compute the inverse Fourier transform for a list of FFT lines.
+
+    Args:
+        fft_lines (list): List of FFT lines.
+
+    Returns:
+        list: List of waves obtained from the inverse Fourier transform of each FFT line.
+    """
+    waves = [np.abs(ifft2(ifftshift(fft_line))) for fft_line in fft_lines]
+    return waves
 
 
 images_path = glob.glob("images/*.tif")
@@ -241,9 +286,9 @@ image_5, image_6, image_7 = images_dic.values()
 spectrum_5 = calculate_spectral_density(image_5)
 spectrum_6 = calculate_spectral_density(image_6)
 spectrum_7 = calculate_spectral_density(image_7)
-draw_all_contours(spectrum_5, image_5_name, factor=0.015)
-draw_all_contours(spectrum_6, image_6_name, factor=0.028)
-draw_all_contours(spectrum_7, image_7_name, factor=0.0182)
+#draw_all_contours(spectrum_5, image_5_name, factor=0.015)
+#draw_all_contours(spectrum_6, image_6_name, factor=0.028)
+#draw_all_contours(spectrum_7, image_7_name, factor=0.0182)
 
 contour2remove_5 = [6, 8]
 contour2remove_6 = [3, 12]
@@ -251,9 +296,9 @@ contour2remove_7 = [2, 3, 4, 6, 7, 9, 10, 13, 14, 15, 17, 18]
 contours_5 = remove_contours(spectrum_5, contour2remove_5, factor=0.015)
 contours_6 = remove_contours(spectrum_6, contour2remove_6, factor=0.028)
 contours_7 = remove_contours(spectrum_7, contour2remove_7, factor=0.0182)
-draw_good_contours(spectrum_5, image_5_name, contours_5)
-draw_good_contours(spectrum_6, image_6_name, contours_6)
-draw_good_contours(spectrum_7, image_7_name, contours_7)
+#draw_good_contours(spectrum_5, image_5_name, contours_5)
+#draw_good_contours(spectrum_6, image_6_name, contours_6)
+#draw_good_contours(spectrum_7, image_7_name, contours_7)
 
 centroids_5, uncert_5 = find_contour_centroids(contours_5, image_5)
 centroids_6, uncert_6 = find_contour_centroids(contours_6, image_6)
@@ -262,6 +307,31 @@ centroids_7, uncert_7 = find_contour_centroids(contours_7, image_7)
 pos_pairs_5 = find_pairs(spectrum_5, centroids_5)
 pos_pairs_6 = find_pairs(spectrum_6, centroids_6)
 pos_pairs_7 = find_pairs(spectrum_7, centroids_7)
-draw_pairs(spectrum_5, image_5_name, pos_pairs_5)
-draw_pairs(spectrum_6, image_6_name, pos_pairs_6)
-draw_pairs(spectrum_7, image_7_name, pos_pairs_7)
+#draw_pairs(spectrum_5, image_5_name, pos_pairs_5)
+#draw_pairs(spectrum_6, image_6_name, pos_pairs_6)
+#draw_pairs(spectrum_7, image_7_name, pos_pairs_7)
+
+fft_lines_5, slopes_5 = create_cos_fourier_spaces(spectrum_5, pos_pairs_5)
+fft_lines_6, slopes_6 = create_cos_fourier_spaces(spectrum_6, pos_pairs_6)
+fft_lines_7, slopes_7 = create_cos_fourier_spaces(spectrum_7, pos_pairs_7)
+
+waves_5 = inverse_fourier_transform(fft_lines_5)
+waves_6 = inverse_fourier_transform(fft_lines_6)
+waves_7 = inverse_fourier_transform(fft_lines_7)
+
+nb_plan = len(fft_lines_5)
+rows = nb_plan//3
+if nb_plan%3 != 0:
+	rows += 1
+fig, ax = plt.subplots(nrows=rows, ncols=3)
+plt.subplots_adjust(wspace=0.01, hspace=0.01)
+for i in range(3*rows):
+    y = i//3
+    x = i%3
+    if i >= nb_plan:
+        fig.delaxes(ax[y][x])
+    else:
+        ax[y][x].imshow(waves_5[i], cmap="gray")
+        ax[y][x].set_axis_off()
+plt.plot()
+plt.show()
