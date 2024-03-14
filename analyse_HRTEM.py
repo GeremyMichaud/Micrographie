@@ -6,6 +6,7 @@ import os
 import glob
 import cv2
 import imageio.v2 as imageio
+from skimage.transform import rotate
 import seaborn as sns
 palette = sns.color_palette("colorblind")
 
@@ -255,7 +256,7 @@ def create_cos_fourier_spaces(image, pairs):
         y1, x1 = first_point
         y2, x2 = second_point
 
-        fft_line = np.zeros(image.shape, dtype=np.int32)
+        fft_line = np.zeros(image.shape, dtype=np.complex128)
         fft_line[y1][x1] = 1000
         fft_line[y_center][x_center] = 1000
         fft_lines.append(fft_line)
@@ -277,6 +278,112 @@ def inverse_fourier_transform(fft_lines):
     waves = [np.abs(ifft2(ifftshift(fft_line))) for fft_line in fft_lines]
     return waves
 
+def plot_waves(wave_patterns, name, step=4):
+    """
+    Plot wave patterns into a single PNG image.
+
+    Args:
+        waves (list): List of wave patterns.
+        name (string): Nom du fichier à sauvegarder
+    """
+    num_patterns = len(wave_patterns)
+    rows = num_patterns // 3
+    if num_patterns % 3 != 0:
+        rows += 1
+
+    fig, ax = plt.subplots(nrows=rows, ncols=3)
+    plt.subplots_adjust(wspace=0.01, hspace=0.01)
+
+    for i in range(3 * rows):
+        y = i // 3
+        x = i % 3
+        if i >= num_patterns:
+            fig.delaxes(ax[y][x])
+        else:
+            ax[y][x].imshow(wave_patterns[i], cmap="gray")
+            ax[y][x].set_axis_off()
+
+    if step == 4:
+        out_dir = os.path.join("output", "04_wave_patterns")
+    elif step == 5:
+        out_dir = os.path.join("output", "05_rotated_waves")
+    else:
+        raise ValueError("Step must be either 4 or 5.")
+    os.makedirs(out_dir, exist_ok=True)
+    plt.savefig(os.path.join(out_dir, name + ".png"))
+    plt.close()
+
+def rotate_waves(waves, pentes):
+    """
+    Rotate wave patterns based on the given slopes.
+
+    Args:
+        waves (list): List of wave patterns.
+        pentes (list): List of slopes corresponding to each wave pattern.
+
+    Returns:
+        list: List of rotated wave patterns.
+    """
+    rotated_waves = []
+
+    for wave, pente in zip(waves, pentes):
+        theta = np.degrees(np.arctan(-1 / pente))
+        rotated = rotate(wave, theta, resize=False, center=None, order=None,
+            mode='constant', cval=0, clip=True, preserve_range=False)
+        rotated_waves.append(rotated)
+
+    return rotated_waves
+
+def extract_1d_signals(rotated_waves):
+    """
+    Extract 1D signals from rotated wave patterns.
+
+    Args:
+        rotated_waves (list): List of rotated wave patterns.
+
+    Returns:
+        list: List of 1D signals.
+        numpy.ndarray: 1D array representing the x-coordinate of the signals.
+    """
+    signals = []
+    for rotated_wave in rotated_waves:
+        signals.append(rotated_wave[:, int(rotated_wave.shape[1] / 2)])
+
+    return signals
+
+def plot_1d_signals(signals_1d, name):
+    """
+    Plot 1D signals into a single PNG image.
+
+    Args:
+        signals_1d (list): List of 1D signals.
+        name (string): Name of the output image file.
+    """
+    num_signals = len(signals_1d)
+    rows = num_signals // 3
+    if num_signals % 3 != 0:
+        rows += 1
+
+    fig, ax = plt.subplots(nrows=rows, ncols=3, sharey=True)
+    plt.subplots_adjust(wspace=0.1, hspace=0.25)
+
+    for i in range(3 * rows):
+        y = i // 3
+        x = i % 3
+        if i >= num_signals:
+            fig.delaxes(ax[y][x])
+        else:
+            signal_y = signals_1d[i]
+            signal_x = np.linspace(0, signal_y.shape[0], signal_y.shape[0])
+            signal_y = signal_y / np.amax(signal_y)
+            ax[y][x].plot(signal_x, signal_y, color=palette[9])
+            ax[y][x].tick_params(axis="both", which="both", direction="in")
+            ax[y][x].minorticks_on()
+
+    out_dir = os.path.join("output", "06_1d_signals")
+    os.makedirs(out_dir, exist_ok=True)
+    plt.savefig(os.path.join(out_dir, name + ".png"))
+    plt.close()
 
 images_path = glob.glob("images/*.tif")
 images_dic = {os.path.splitext(os.path.basename(chemin_image))[0]: imageio.imread(chemin_image) for chemin_image in images_path}
@@ -318,20 +425,20 @@ fft_lines_7, slopes_7 = create_cos_fourier_spaces(spectrum_7, pos_pairs_7)
 waves_5 = inverse_fourier_transform(fft_lines_5)
 waves_6 = inverse_fourier_transform(fft_lines_6)
 waves_7 = inverse_fourier_transform(fft_lines_7)
+#plot_waves(waves_5, image_5_name, step=4)
+#plot_waves(waves_6, image_6_name, step=4)
+#plot_waves(waves_7, image_7_name, step=4)
 
-nb_plan = len(fft_lines_5)
-rows = nb_plan//3
-if nb_plan%3 != 0:
-	rows += 1
-fig, ax = plt.subplots(nrows=rows, ncols=3)
-plt.subplots_adjust(wspace=0.01, hspace=0.01)
-for i in range(3*rows):
-    y = i//3
-    x = i%3
-    if i >= nb_plan:
-        fig.delaxes(ax[y][x])
-    else:
-        ax[y][x].imshow(waves_5[i], cmap="gray")
-        ax[y][x].set_axis_off()
-plt.plot()
-plt.show()
+rotated_waves_5 = rotate_waves(waves_5, slopes_5)
+rotated_waves_6 = rotate_waves(waves_6, slopes_6)
+rotated_waves_7 = rotate_waves(waves_7, slopes_7)
+#plot_waves(rotated_waves_5, image_5_name, step=5)
+#plot_waves(rotated_waves_6, image_6_name, step=5)
+#plot_waves(rotated_waves_7, image_7_name, step=5)
+
+signals_5 = extract_1d_signals(rotated_waves_5)
+signals_6 = extract_1d_signals(rotated_waves_6)
+signals_7 = extract_1d_signals(rotated_waves_7)
+#plot_1d_signals(signals_5, image_5_name)
+#plot_1d_signals(signals_6, image_6_name)
+#plot_1d_signals(signals_7, image_7_name)
