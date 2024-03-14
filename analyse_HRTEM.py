@@ -9,8 +9,6 @@ import imageio.v2 as imageio
 import seaborn as sns
 palette = sns.color_palette("colorblind")
 
-images_path = glob.glob("images/*.tif")
-images_dic = {os.path.splitext(os.path.basename(chemin_image))[0]: imageio.imread(chemin_image) for chemin_image in images_path}
 
 def calculate_spectral_density(image):
     """
@@ -24,7 +22,7 @@ def calculate_spectral_density(image):
     """
     spectrum = fftshift(fft2(image))
     spectral_density = np.abs(spectrum)
-    
+
     return spectral_density
 
 def process_image(image, tresh_factor):
@@ -38,9 +36,8 @@ def process_image(image, tresh_factor):
     Returns:
         list, une liste de contours des régions d'intérêt fermées
     """
-    spectrum = calculate_spectral_density(image)
-    threshold = tresh_factor * np.max(spectrum)
-    regions_of_interest = (spectrum > threshold).astype(np.uint8)
+    threshold = tresh_factor * np.max(image)
+    regions_of_interest = (image > threshold).astype(np.uint8)
 
     kernel = np.ones((5, 5), np.uint8)
     regions_of_interest_closed = cv2.morphologyEx(regions_of_interest, cv2.MORPH_CLOSE, kernel)
@@ -49,7 +46,7 @@ def process_image(image, tresh_factor):
 
     return contours
 
-def draw_contours(image, name, factor=0.02):
+def draw_all_contours(image, name, factor=0.02):
     """
     Dessine les contours des régions d'intérêt sur l'image de densité spectrale.
     
@@ -59,14 +56,13 @@ def draw_contours(image, name, factor=0.02):
         factor: float, facteur de seuillage pour déterminer le seuil de binarisation
     """
     cnt = process_image(image, factor)
-    spectrum = calculate_spectral_density(image)
-    rescaled_spectrum = cv2.normalize(np.log(spectrum), None, 0, 255, cv2.NORM_MINMAX)
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, cv2.NORM_MINMAX)
     colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), cv2.COLOR_GRAY2BGR)
 
     for i, contour in enumerate(cnt):
         cv2.drawContours(colored_spectrum, [contour], -1, (0, 0, 255), 2)
         contour_center = contour.mean(axis=0).astype(int)[0]
-        cv2.putText(colored_spectrum, str(i), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
+        cv2.putText(colored_spectrum, str(i+1), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
 
     directory = os.path.join("output", "all_contours")
     if not os.path.exists(directory):
@@ -74,36 +70,41 @@ def draw_contours(image, name, factor=0.02):
 
     cv2.imwrite(os.path.join(directory, name + ".png"), colored_spectrum)
 
-def remove_contours(image, name, contours_to_remove, factor=0.02):
+def remove_contours(image, contours_to_remove, factor=0.02):
     """
-    Remove specified contours from the image.
+    Remove specified contours from the list.
     
     Args:
         image: np.ndarray, the grayscale image
-        name: str, the file name to save
         contours_to_remove: list, list of contour indices to remove
         factor: float, thresholding factor to determine the binarization threshold
     """
-    cnt = process_image(image, factor)
-    spectrum = calculate_spectral_density(image)
-    rescaled_spectrum = cv2.normalize(np.log(spectrum), None, 0, 255, cv2.NORM_MINMAX)
+    bad_cnt = process_image(image, factor)
+    good_cnt = [contour for i, contour in enumerate(bad_cnt) if i not in contours_to_remove]
+
+    return good_cnt
+
+def draw_good_contours(image, name, contours):
+    """
+    Draw only good contours on an image and save it.
+
+    Args:
+        image (np.ndarray): Input grayscale image.
+        name (str): Name of the output image file.
+        contours (list): List of contours to draw on the image.
+    """
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, cv2.NORM_MINMAX)
     colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), cv2.COLOR_GRAY2BGR)
 
-    # Remove specified contours
-    cnt = [contour for i, contour in enumerate(cnt) if i not in contours_to_remove]
-
-    for i, contour in enumerate(cnt):
+    for i, contour in enumerate(contours):
         cv2.drawContours(colored_spectrum, [contour], -1, (0, 0, 255), 2)
         contour_center = contour.mean(axis=0).astype(int)[0]
-        cv2.putText(colored_spectrum, str(i), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
+        cv2.putText(colored_spectrum, str(i+1), tuple(contour_center), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 255, 255), 2)
 
     directory = os.path.join("output", "contours_removed")
-    if not os.path.exists(directory):
-            os.makedirs(directory)
-
+    os.makedirs(directory, exist_ok=True)
     cv2.imwrite(os.path.join(directory, name + ".png"), colored_spectrum)
 
-    return cnt
 
 def gaussian(x, a, x0, sigma):
     """
@@ -124,7 +125,7 @@ def find_contour_centroids(contours, image):
     """
     Find centroids of contours in an image.
 
-    Parameters:
+    Args:
         contours (list): List of contours.
         image (np.ndarray): Grayscale image.
 
@@ -173,19 +174,94 @@ def find_contour_centroids(contours, image):
 
     return centroids, centroids_uncertainty
 
+def find_pairs(image, centroids):
+    """
+    Trouve les paires de centroïdes symétriques.
+
+
+    Args:
+        image (np.ndarray): L'image.
+        centroids (list): Liste des coordonnées des centroïdes à rechercher.
+
+    Returns:
+        list: Liste de paires de centroïdes symétriques.
+    """
+    pos_pairs = []
+    centroids2match = centroids.copy()
+
+    for c in centroids2match:
+        y, x = c
+
+        center_y = int(image.shape[0] / 2) - 10 <= y <= int(image.shape[0] / 2) + 10
+        center_x = int(image.shape[1] / 2) - 10 <= x <= int(image.shape[1] / 2) + 10
+        if center_y and center_x:
+            continue
+
+        y_prime = 2 * (int(image.shape[0] / 2) - y) + y
+        x_prime = 2 * (int(image.shape[1] / 2) - x) + x
+
+        for c_prime in centroids2match:
+            y_prime_centroid, x_prime_centroid = c_prime
+            if abs(y_prime_centroid - y_prime) <= 10 and abs(x_prime_centroid - x_prime) <= 10:
+                pos_pairs.append((c, c_prime))
+                centroids2match.remove(c_prime)
+                break
+
+    return pos_pairs
+
+def draw_pairs(image, name, pairs):
+    """
+    Draw pairs of points.
+
+    Args:
+        image (np.ndarray): Input grayscale image.
+        name (str): Name of the output image file.
+        pairs (list): List of pairs of points to draw on the image.
+    """
+    rescaled_spectrum = cv2.normalize(np.log(image), None, 0, 255, cv2.NORM_MINMAX)
+    colored_spectrum = cv2.cvtColor(rescaled_spectrum.astype(np.uint8), cv2.COLOR_GRAY2BGR)
+
+    for i, (start_point, end_point) in enumerate(pairs):
+        color = tuple(np.random.randint(0, 256, 3).tolist())
+        cv2.line(colored_spectrum, start_point, end_point, color, 1, cv2.LINE_AA)
+        for point in [start_point, end_point]:
+            cv2.putText(colored_spectrum, str(i + 1), point, cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+
+    out_dir = os.path.join("output", "pairs")
+    os.makedirs(out_dir, exist_ok=True)
+    cv2.imwrite(os.path.join(out_dir, name + ".png"), colored_spectrum)
+
+
+
+images_path = glob.glob("images/*.tif")
+images_dic = {os.path.splitext(os.path.basename(chemin_image))[0]: imageio.imread(chemin_image) for chemin_image in images_path}
+
 image_5_name, image_6_name, image_7_name = images_dic.keys()
 image_5, image_6, image_7 = images_dic.values()
-#draw_contours(image_5, image_5_name, factor=0.015)
-#draw_contours(image_6, image_6_name, factor=0.028)
-#draw_contours(image_7, image_7_name, factor=0.0182)
+spectrum_5 = calculate_spectral_density(image_5)
+spectrum_6 = calculate_spectral_density(image_6)
+spectrum_7 = calculate_spectral_density(image_7)
+draw_all_contours(spectrum_5, image_5_name, factor=0.015)
+draw_all_contours(spectrum_6, image_6_name, factor=0.028)
+draw_all_contours(spectrum_7, image_7_name, factor=0.0182)
 
 contour2remove_5 = [6, 8]
 contour2remove_6 = [3, 12]
 contour2remove_7 = [2, 3, 4, 6, 7, 9, 10, 13, 14, 15, 17, 18]
-contours_5 = remove_contours(image_5, image_5_name, contour2remove_5, factor=0.015)
-contours_6 = remove_contours(image_6, image_6_name, contour2remove_6, factor=0.028)
-contours_7 = remove_contours(image_7, image_7_name, contour2remove_7, factor=0.0182)
+contours_5 = remove_contours(spectrum_5, contour2remove_5, factor=0.015)
+contours_6 = remove_contours(spectrum_6, contour2remove_6, factor=0.028)
+contours_7 = remove_contours(spectrum_7, contour2remove_7, factor=0.0182)
+draw_good_contours(spectrum_5, image_5_name, contours_5)
+draw_good_contours(spectrum_6, image_6_name, contours_6)
+draw_good_contours(spectrum_7, image_7_name, contours_7)
 
 centroids_5, uncert_5 = find_contour_centroids(contours_5, image_5)
 centroids_6, uncert_6 = find_contour_centroids(contours_6, image_6)
 centroids_7, uncert_7 = find_contour_centroids(contours_7, image_7)
+
+pos_pairs_5 = find_pairs(spectrum_5, centroids_5)
+pos_pairs_6 = find_pairs(spectrum_6, centroids_6)
+pos_pairs_7 = find_pairs(spectrum_7, centroids_7)
+draw_pairs(spectrum_5, image_5_name, pos_pairs_5)
+draw_pairs(spectrum_6, image_6_name, pos_pairs_6)
+draw_pairs(spectrum_7, image_7_name, pos_pairs_7)
