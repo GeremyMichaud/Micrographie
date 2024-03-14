@@ -108,7 +108,6 @@ def draw_good_contours(image, name, contours):
     os.makedirs(directory, exist_ok=True)
     cv2.imwrite(os.path.join(directory, name + ".png"), colored_spectrum)
 
-
 def gaussian(x, a, x0, sigma):
     """
     Gaussian function.
@@ -396,39 +395,51 @@ def calculate_d_spacings(signals_1d, pixel_resolution=42.468):
         pixel_resolution (float): Pixel resolution in picometers (default is 42.468).
 
     Returns:
-        tuple: Tuple containing lists of d-spacings and d-spacings in picometers.
+        tuple: A tuple of two tuples containing:
+            - A list of mean d-spacings and their standard deviations (in pixels).
+            - A list of mean d-spacings and their standard deviations (in picometers).
     """
     d_spacings = []
+    d_spacings_std = []
     d_spacings_res = []
+    d_spacings_res_std = []
 
     for signal_1d in signals_1d:
         peaks = sc.find_peaks(signal_1d)[0]
         num_peaks = len(peaks)
         if num_peaks > 1:
-            d_spacing = (peaks[-1] - peaks[0]) / (num_peaks - 1)
+            peak_distances = np.diff(peaks)
+            d_spacing = np.mean(peak_distances)
+            d_spacing_std = np.std(peak_distances)
+
             d_spacings.append(d_spacing)
-            d_spacings_res.append(d_spacing * pixel_resolution)
+            d_spacings_std.append(d_spacing_std)
+            d_spacings_res.append(d_spacing* pixel_resolution)
+            d_spacings_res_std.append(d_spacing_std * pixel_resolution)
 
-    return d_spacings, d_spacings_res
+    return (d_spacings, d_spacings_std), (d_spacings_res, d_spacings_res_std)
 
-def print_d_spacings(d_spacings, d_spacings_res, name):
+def print_d_spacings(d_spacings, d_spacings_uncert, d_spacings_res, d_spacings_res_uncert, name):
     """
     Print d-spacings and uncertainties.
 
     Args:
-        d_spacings (list): List of d-spacings.
-        d_spacings_res (list): List of d-spacings in picometers.
+        d_spacings (list): List of mean d-spacings.
+        d_spacings_uncert (list): List of uncertainties in mean d-spacings (in pixels).
+        d_spacings_res (list): List of mean d-spacings in picometers.
+        d_spacings_res_uncert (list): List of uncertainties in mean d-spacings (in picometers).
+        name (str): Name of the sample or dataset.
     """
-    print("\nTable of D-Spacing of {}".format(name))
-    print("Index |  D-Spacing (pixels)  | D-Spacing (picometers)")
-    print("-----------------------------------------------------")
-    for i, (d, d_res) in enumerate(zip(d_spacings, d_spacings_res), 1):
+    print("\n\tTable of D-Spacing of {}".format(name))
+    print("Index |  D-Spacing (pixels)  |  D-Spacing (picometers)")
+    print("------------------------------------------------------")
+    for i, (d, uncert, d_res, res_uncert) in enumerate(zip(d_spacings, d_spacings_uncert, d_spacings_res, d_spacings_res_uncert), 1):
         spacing_str = f"{d:.3f}"
-        incertitude_str = f"?"
+        incertitude_str = f"{uncert:.3f}"
         spacing_res_str = f"{d_res:.3f}"
-        incertitude_res_str = f"?"
+        incertitude_res_str = f"{res_uncert:.3f}"
         index_str = str(i).rjust(5, "0")
-        print(f"{index_str} |  {spacing_str} ± {incertitude_str}  |  {spacing_res_str} ± {incertitude_res_str}")
+        print(f"{index_str} |     {spacing_str} ± {incertitude_str}    |     {spacing_res_str} ± {incertitude_res_str}")
 
 if __name__ == "__main__":
     images_path = glob.glob("images/*.tif")
@@ -439,9 +450,9 @@ if __name__ == "__main__":
     spectrum_5 = calculate_spectral_density(image_5)
     spectrum_6 = calculate_spectral_density(image_6)
     spectrum_7 = calculate_spectral_density(image_7)
-    draw_all_contours(spectrum_5, image_5_name, factor=0.015)
-    draw_all_contours(spectrum_6, image_6_name, factor=0.028)
-    draw_all_contours(spectrum_7, image_7_name, factor=0.0182)
+    #draw_all_contours(spectrum_5, image_5_name, factor=0.015)
+    #draw_all_contours(spectrum_6, image_6_name, factor=0.028)
+    #draw_all_contours(spectrum_7, image_7_name, factor=0.0182)
 
     contour2remove_5 = [6, 8]
     contour2remove_6 = [3, 12]
@@ -449,9 +460,9 @@ if __name__ == "__main__":
     contours_5 = remove_contours(spectrum_5, contour2remove_5, factor=0.015)
     contours_6 = remove_contours(spectrum_6, contour2remove_6, factor=0.028)
     contours_7 = remove_contours(spectrum_7, contour2remove_7, factor=0.0182)
-    draw_good_contours(spectrum_5, image_5_name, contours_5)
-    draw_good_contours(spectrum_6, image_6_name, contours_6)
-    draw_good_contours(spectrum_7, image_7_name, contours_7)
+    #draw_good_contours(spectrum_5, image_5_name, contours_5)
+    #draw_good_contours(spectrum_6, image_6_name, contours_6)
+    #draw_good_contours(spectrum_7, image_7_name, contours_7)
 
     centroids_5, uncert_5 = find_contour_centroids(contours_5, image_5)
     centroids_6, uncert_6 = find_contour_centroids(contours_6, image_6)
@@ -460,9 +471,9 @@ if __name__ == "__main__":
     pos_pairs_5 = find_pairs(spectrum_5, centroids_5)
     pos_pairs_6 = find_pairs(spectrum_6, centroids_6)
     pos_pairs_7 = find_pairs(spectrum_7, centroids_7)
-    draw_pairs(spectrum_5, image_5_name, pos_pairs_5)
-    draw_pairs(spectrum_6, image_6_name, pos_pairs_6)
-    draw_pairs(spectrum_7, image_7_name, pos_pairs_7)
+    #draw_pairs(spectrum_5, image_5_name, pos_pairs_5)
+    #draw_pairs(spectrum_6, image_6_name, pos_pairs_6)
+    #draw_pairs(spectrum_7, image_7_name, pos_pairs_7)
 
     fft_lines_5, slopes_5 = create_cos_fourier_spaces(spectrum_5, pos_pairs_5)
     fft_lines_6, slopes_6 = create_cos_fourier_spaces(spectrum_6, pos_pairs_6)
@@ -471,27 +482,27 @@ if __name__ == "__main__":
     waves_5 = inverse_fourier_transform(fft_lines_5)
     waves_6 = inverse_fourier_transform(fft_lines_6)
     waves_7 = inverse_fourier_transform(fft_lines_7)
-    plot_waves(waves_5, image_5_name, step=4)
-    plot_waves(waves_6, image_6_name, step=4)
-    plot_waves(waves_7, image_7_name, step=4)
+    #plot_waves(waves_5, image_5_name, step=4)
+    #plot_waves(waves_6, image_6_name, step=4)
+    #plot_waves(waves_7, image_7_name, step=4)
 
     rotated_waves_5 = rotate_waves(waves_5, slopes_5)
     rotated_waves_6 = rotate_waves(waves_6, slopes_6)
     rotated_waves_7 = rotate_waves(waves_7, slopes_7)
-    plot_waves(rotated_waves_5, image_5_name, step=5)
-    plot_waves(rotated_waves_6, image_6_name, step=5)
-    plot_waves(rotated_waves_7, image_7_name, step=5)
+    #plot_waves(rotated_waves_5, image_5_name, step=5)
+    #plot_waves(rotated_waves_6, image_6_name, step=5)
+    #plot_waves(rotated_waves_7, image_7_name, step=5)
 
     signals_5 = extract_1d_signals(rotated_waves_5)
     signals_6 = extract_1d_signals(rotated_waves_6)
     signals_7 = extract_1d_signals(rotated_waves_7)
-    plot_1d_signals(signals_5, image_5_name)
-    plot_1d_signals(signals_6, image_6_name)
-    plot_1d_signals(signals_7, image_7_name)
+    #plot_1d_signals(signals_5, image_5_name)
+    #plot_1d_signals(signals_6, image_6_name)
+    #plot_1d_signals(signals_7, image_7_name)
 
-    dspace_pix_5, dspace_pm_5 = calculate_d_spacings(signals_5)
-    dspace_pix_6, dspace_pm_6 = calculate_d_spacings(signals_6)
-    dspace_pix_7, dspace_pm_7 = calculate_d_spacings(signals_7)
-    print_d_spacings(dspace_pix_5, dspace_pm_5, image_5_name)
-    print_d_spacings(dspace_pix_6, dspace_pm_6, image_6_name)
-    print_d_spacings(dspace_pix_7, dspace_pm_7, image_7_name)
+    pix_5, pm_5 = calculate_d_spacings(signals_5)
+    pix_6, pm_6 = calculate_d_spacings(signals_6)
+    pix_7, pm_7 = calculate_d_spacings(signals_7)
+    print_d_spacings(pix_5[0], pix_5[1], pm_5[0], pm_5[1], image_5_name)
+    print_d_spacings(pix_6[0], pix_6[1], pm_6[0], pm_6[1], image_6_name)
+    print_d_spacings(pix_7[0], pix_7[1], pm_7[0], pm_7[1], image_7_name)
