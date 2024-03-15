@@ -22,5 +22,3 @@ git clone https://github.com/GeremyMichaud/Micrographie.git
 
 - Félix-Antoine Dupuis
 - Gérémy Michaud
-- Nicolas Dorval
-- Pierre-Olivier Desrosiers
